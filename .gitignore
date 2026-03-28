@@ -6,6 +6,10 @@ __pycache__/
 # Claude Code (histórico de conversa local)
 .claude/
 
+# Dados sensíveis de usuários — não subir
+*.xlsx
+*.csv
+
 # Arquivos temporários
 *.tmp
 ~$*
