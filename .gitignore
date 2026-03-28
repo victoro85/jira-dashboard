@@ -1,0 +1,11 @@
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Claude Code (histórico de conversa local)
+.claude/
+
+# Arquivos temporários
+*.tmp
+~$*

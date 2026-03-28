@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira - Análise de Centros de Custo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background-color: #000;
+            margin: 0; padding: 0; overflow: hidden;
+            display: flex; justify-content: center; align-items: center; height: 100vh;
+        }
+        .slide-container {
+            display: none; flex-direction: column; align-items: flex-start;
+            background-color: #000; border-radius: 20px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9);
+            font-family: 'Urbanist', sans-serif;
+            height: 720px; width: 1280px;
+            padding: 80px; position: relative;
+            border: 1px solid #1a1a1a; justify-content: center;
+        }
+        .slide-container.active { display: flex; animation: slideIn 0.3s ease-out both; }
+        @keyframes slideIn { from { opacity:0; } to { opacity:1; } }
+        .slide-container::before {
+            content:''; position:absolute; top:-20%; right:-10%;
+            width:600px; height:600px;
+            background:radial-gradient(circle, rgba(222,255,154,0.1) 0%, transparent 70%); z-index:0;
+        }
+        .slide-container::after {
+            content:''; position:absolute; bottom:15px; left:80px; right:80px;
+            height:2px; background:linear-gradient(90deg,transparent,#deff9a,transparent); opacity:0.3;
+        }
+        .slide-container > * { position:relative; z-index:2; }
+
+        h1,h2,h3 { color:#fff; font-weight:800; margin:0; }
+        h1 { font-size:150px; letter-spacing:-5px; line-height:0.8; }
+        .slide-title {
+            font-size:52px; margin-bottom:40px; width:100%;
+            border-left:12px solid #deff9a; padding-left:30px; text-transform:uppercase;
+        }
+        .slide-title-sm { font-size:42px; margin-bottom:16px; }
+        .content-area { display:flex; flex-direction:column; flex-grow:1; justify-content:center; width:100%; }
+
+        /* MÉTRICAS */
+        .highlight-numbers { display:flex; justify-content:space-between; width:100%; gap:30px; }
+        .number-card {
+            background:#0a0a0a; border:2px solid #222; border-radius:35px;
+            padding:60px 30px; width:50%; text-align:center;
+        }
+        .number-card .value { font-size:110px; color:#deff9a; font-weight:800; display:block; line-height:1; margin-bottom:15px; }
+        .number-card .label { font-size:22px; text-transform:uppercase; letter-spacing:5px; color:#555; }
+
+        /* MINI CARDS */
+        .mini-cards { display:flex; gap:14px; margin-top:28px; width:100%; }
+        .mini-card {
+            flex:1; background:#0d0d0d; border:1px solid #222; border-radius:14px;
+            padding:16px 12px; text-align:center;
+        }
+        .mini-val { display:block; font-size:30px; font-weight:800; line-height:1; margin-bottom:6px; }
+        .mini-lbl { font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1.5px; }
+
+        /* BARRAS */
+        .chart-container { display:flex; flex-direction:column; gap:9px; width:100%; }
+        .bar { align-items:center; display:flex; gap:20px; }
+        .bar .label {
+            color:#aaa; flex:0 0 300px; font-weight:700; text-align:right;
+            font-size:15px; font-family:monospace; text-transform:uppercase;
+            letter-spacing:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        .bar .bar-inner {
+            background-color:#0f0f0f; border-radius:10px; flex-grow:1;
+            height:50px; border:1px solid #1e1e1e;
+            display:flex; align-items:center; overflow:hidden;
+        }
+        .bar .bar-fill {
+            height:100%; border-radius:8px;
+            background:linear-gradient(90deg,#deff9a,#a8cf5f);
+            box-shadow:0 0 16px rgba(222,255,154,0.2);
+        }
+        .bar-label-out {
+            color:#deff9a; font-weight:800; font-size:20px;
+            white-space:nowrap; flex:0 0 130px; text-align:right;
+        }
+        .chart-sm  { gap:5px !important; }
+        .chart-sm  .bar .bar-inner { height:38px; }
+        .chart-sm  .bar-label-out  { font-size:17px; }
+        .chart-sm  .bar .label     { font-size:13px; }
+        .chart-xs  { gap:4px !important; }
+        .chart-xs  .bar .bar-inner { height:30px; }
+        .chart-xs  .bar-label-out  { font-size:14px; }
+        .chart-xs  .bar .label     { font-size:11px; }
+        .chart-xxs { gap:3px !important; }
+        .chart-xxs .bar .bar-inner { height:28px; }
+        .chart-xxs .bar-label-out  { font-size:13px; }
+        .chart-xxs .bar .label     { font-size:11px; }
+
+        /* TABELA PRODUTOS */
+        .prod-table {
+            width:100%; border-collapse:collapse; table-layout:fixed;
+        }
+        .prod-table col.c-dir  { width:22%; }
+        .prod-table col.c-usr  { width:8%; }
+        .prod-table col.c-prod { width:17.5%; }
+        .prod-table thead tr {
+            border-bottom:2px solid #222;
+        }
+        .prod-table thead th {
+            text-align:center; padding:0 4px 12px;
+            font-size:10px; text-transform:uppercase;
+            letter-spacing:0.5px; vertical-align:bottom;
+            white-space:nowrap; overflow:hidden;
+        }
+        .prod-table thead th:first-child { text-align:left; color:#deff9a; }
+        .prod-table thead th:nth-child(2) { color:#666; }
+        .prod-table tbody tr { height:52px; }
+        .prod-table tbody tr + tr td { border-top:1px solid #111; }
+        .prod-table tbody td {
+            background:#0d0d0d; padding:0 4px;
+            text-align:center; vertical-align:middle;
+        }
+        .prod-table tbody td:first-child {
+            border-radius:10px 0 0 10px; color:#fff; font-family:monospace;
+            font-size:13px; font-weight:700; text-align:left; padding-left:14px;
+        }
+        .prod-table tbody td:last-child { border-radius:0 10px 10px 0; }
+        .total-cell { color:#555 !important; font-size:13px !important; }
+        .badge {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:40px; height:40px; border-radius:50%; font-weight:800; font-size:15px;
+        }
+        /* Tabela compacta para muitas diretorias */
+        .prod-table-sm tbody tr { height:36px; }
+        .prod-table-sm tbody td:first-child { font-size:11px; }
+        .prod-table-sm .badge { width:30px; height:30px; font-size:12px; }
+        .prod-table-sm .total-cell { font-size:11px !important; }
+        .prod-table-xs tbody tr { height:28px; }
+        .prod-table-xs tbody td:first-child { font-size:10px; padding-left:8px; }
+        .prod-table-xs .badge { width:24px; height:24px; font-size:10px; }
+        .prod-table-xs .total-cell { font-size:10px !important; }
+
+        /* CARDS PRODUTO */
+        .prod-cards { display:flex; gap:30px; width:100%; justify-content:center; }
+        .prod-card {
+            background:#0a0a0a; border:2px solid #222; border-radius:25px;
+            padding:40px 30px; flex:1; text-align:center;
+        }
+        .prod-value { font-size:80px; font-weight:800; display:block; line-height:1; }
+        .prod-pct   { font-size:24px; font-weight:700; display:block; margin:8px 0 12px; }
+        .prod-label { font-size:16px; text-transform:uppercase; letter-spacing:3px; color:#555; display:block; }
+
+        /* NAV */
+        .nav-hint {
+            position:fixed; bottom:25px; right:40px; color:#333; font-size:14px;
+            text-transform:uppercase; letter-spacing:3px; font-weight:600; font-family:'Urbanist',sans-serif;
+        }
+        .slide-counter {
+            position:fixed; bottom:25px; left:40px; color:#333; font-size:14px;
+            letter-spacing:3px; font-family:'Urbanist',sans-serif; font-weight:600;
+        }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: CAPA -->
+<div class="slide-container active">
+    <div style="text-align:center; width:100%;">
+        <h1>JIRA</h1>
+        <h3 style="letter-spacing:12px; text-transform:uppercase; color:#deff9a; margin-top:15px; font-size:35px;">
+            Análise de Centros de Custo
+        </h3>
+        <p style="margin-top:50px; font-size:30px; color:#555;">Dashboard Executivo · Março 2026</p>
+    </div>
+</div>
+
+<!-- SLIDE 2: MÉTRICAS GERAIS -->
+<div class="slide-container">
+    <h2 class="slide-title">Métricas Gerais</h2>
+    <div class="content-area">
+        <div class="highlight-numbers">
+            <div class="number-card">
+                <span class="value">228</span>
+                <span class="label">Usuários Ativos</span>
+            </div>
+            <div class="number-card">
+                <span class="value">552</span>
+                <span class="label">Licenças Totais</span>
+            </div>
+        </div>
+        <div class="mini-cards">
+            <div class="mini-card" style="border-color:#CCFF0033;">
+                <span class="mini-val" style="color:#CCFF00;">223</span>
+                <span class="mini-lbl">Jira</span>
+            </div>
+            <div class="mini-card" style="border-color:#00BFFF33;">
+                <span class="mini-val" style="color:#00BFFF;">201</span>
+                <span class="mini-lbl">Confluence</span>
+            </div>
+            <div class="mini-card" style="border-color:#FF6B3533;">
+                <span class="mini-val" style="color:#FF6B35;">58</span>
+                <span class="mini-lbl">Jira Service Management</span>
+            </div>
+            <div class="mini-card" style="border-color:#BF7FFF33;">
+                <span class="mini-val" style="color:#BF7FFF;">70</span>
+                <span class="mini-lbl">Jira Product Discovery</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 3: DISTRIBUIÇÃO POR DIRETORIA -->
+<div class="slide-container" style="padding:50px 80px 75px;">
+    <h2 class="slide-title slide-title-sm">Distribuição por Diretoria</h2>
+    <div class="content-area">
+        <div class="chart-container chart-xxs">
+
+            <div class="bar">
+                <div class="label">ESTRATÉGIA DIGITAL</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:100%;"></div></div>
+                <span class="bar-label-out" style="">69</span>
+            </div>
+            <div class="bar">
+                <div class="label">AUDIÊNCIA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:58%;"></div></div>
+                <span class="bar-label-out" style="">40</span>
+            </div>
+            <div class="bar">
+                <div class="label">SISTEMA PRO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:46%;"></div></div>
+                <span class="bar-label-out" style="">32</span>
+            </div>
+            <div class="bar">
+                <div class="label">TECNOLOGIA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:46%;"></div></div>
+                <span class="bar-label-out" style="">32</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO VALOR ECONÔMICO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:14%;"></div></div>
+                <span class="bar-label-out" style="">10</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO SEGMENTADA I</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:14%;"></div></div>
+                <span class="bar-label-out" style="">10</span>
+            </div>
+            <div class="bar">
+                <div class="label">DESENVOLVIMENTO COMERCIAL</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:13%;"></div></div>
+                <span class="bar-label-out" style="">9</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR PRO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:10%;"></div></div>
+                <span class="bar-label-out" style="">7</span>
+            </div>
+            <div class="bar">
+                <div class="label">AUDIÊNCIA ASSINATURAS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:7%;"></div></div>
+                <span class="bar-label-out" style="">5</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO INTEGRADA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">3</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR INVESTE</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">2</span>
+            </div>
+            <div class="bar">
+                <div class="label">LIVRE ACESSO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">2</span>
+            </div>
+            <div class="bar">
+                <div class="label">PROJETOS ESPECIAIS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">2</span>
+            </div>
+            <div class="bar">
+                <div class="label">CBN</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">1</span>
+            </div>
+            <div class="bar">
+                <div class="label">FINANÇAS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">1</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO SEGMENTADA II</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">1</span>
+            </div>
+            <div class="bar">
+                <div class="label">SERVIÇOS IMPRESSOS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">1</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR ONE</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">1</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: CUSTO POR DIRETORIA -->
+<div class="slide-container" style="padding:30px 80px 75px;">
+    <h2 class="slide-title slide-title-sm" style="font-size:34px; margin-bottom:6px;">Custo por Diretoria</h2>
+    <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:8px;">
+        <span style="font-size:11px; color:#555; text-transform:uppercase; letter-spacing:2px;">Total mensal</span>
+        <span style="font-size:22px; font-weight:800; color:#deff9a;">US$ 5.167</span>
+        <span style="font-size:11px; color:#555; text-transform:uppercase; letter-spacing:2px; margin-left:12px;">Anual estimado</span>
+        <span style="font-size:22px; font-weight:800; color:#555;">US$ 62.010</span>
+    </div>
+    <div class="content-area">
+        <div class="chart-container chart-xxs">
+
+            <div class="bar">
+                <div class="label">ESTRATÉGIA DIGITAL</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:100%;"></div></div>
+                <span class="bar-label-out" style="">US$ 1.600</span>
+            </div>
+            <div class="bar">
+                <div class="label">AUDIÊNCIA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:65%;"></div></div>
+                <span class="bar-label-out" style="">US$ 1.036</span>
+            </div>
+            <div class="bar">
+                <div class="label">TECNOLOGIA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:59%;"></div></div>
+                <span class="bar-label-out" style="">US$ 950</span>
+            </div>
+            <div class="bar">
+                <div class="label">SISTEMA PRO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:31%;"></div></div>
+                <span class="bar-label-out" style="">US$ 489</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO SEGMENTADA I</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:18%;"></div></div>
+                <span class="bar-label-out" style="">US$ 294</span>
+            </div>
+            <div class="bar">
+                <div class="label">DESENVOLVIMENTO COMERCIAL</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:14%;"></div></div>
+                <span class="bar-label-out" style="">US$ 226</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO VALOR ECONÔMICO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:13%;"></div></div>
+                <span class="bar-label-out" style="">US$ 201</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR PRO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:7%;"></div></div>
+                <span class="bar-label-out" style="">US$ 106</span>
+            </div>
+            <div class="bar">
+                <div class="label">AUDIÊNCIA ASSINATURAS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 89</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO INTEGRADA</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 84</span>
+            </div>
+            <div class="bar">
+                <div class="label">LIVRE ACESSO</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 29</span>
+            </div>
+            <div class="bar">
+                <div class="label">PROJETOS ESPECIAIS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 29</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR INVESTE</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 29</span>
+            </div>
+            <div class="bar">
+                <div class="label">FINANÇAS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 29</span>
+            </div>
+            <div class="bar">
+                <div class="label">CBN</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 14</span>
+            </div>
+            <div class="bar">
+                <div class="label">REDAÇÃO SEGMENTADA II</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 14</span>
+            </div>
+            <div class="bar">
+                <div class="label">SERVIÇOS IMPRESSOS</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 14</span>
+            </div>
+            <div class="bar">
+                <div class="label">VALOR ONE</div>
+                <div class="bar-inner"><div class="bar-fill" style="width:6%;"></div></div>
+                <span class="bar-label-out" style="">US$ 14</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" style="padding:50px 80px 70px;">
+    <h2 class="slide-title" style="margin-bottom:20px;">Licenças por Diretoria</h2>
+    <div class="content-area">
+        <table class="prod-table">
+            <colgroup><col class="c-dir"><col class="c-usr"><col class="c-prod"><col class="c-prod"><col class="c-prod"><col class="c-prod"></colgroup>
+            <thead><tr><th>Diretoria</th><th>Usuários</th><th style="color:#CCFF00;">Jira</th><th style="color:#00BFFF;">Confluence</th><th style="color:#FF6B35;">Jira Service Management</th><th style="color:#BF7FFF;">Jira Product Discovery</th></tr></thead>
+            <tbody><tr><td>ESTRATÉGIA DIGITAL</td><td class="total-cell">69</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">69</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">69</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">14</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">24</span></td></tr>
+<tr><td>AUDIÊNCIA</td><td class="total-cell">40</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">38</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">38</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">14</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">14</span></td></tr>
+<tr><td>SISTEMA PRO</td><td class="total-cell">32</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">32</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">26</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">5</span></td></tr>
+<tr><td>TECNOLOGIA</td><td class="total-cell">32</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">32</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">20</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">20</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">8</span></td></tr>
+<tr><td>REDAÇÃO VALOR ECONÔMICO</td><td class="total-cell">10</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">10</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">8</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">1</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">4</span></td></tr>
+<tr><td>REDAÇÃO SEGMENTADA I</td><td class="total-cell">10</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">10</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">10</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">4</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">5</span></td></tr>
+<tr><td>DESENVOLVIMENTO COMERCIAL</td><td class="total-cell">9</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">9</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">8</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">2</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">5</span></td></tr>
+<tr><td>VALOR PRO</td><td class="total-cell">7</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">7</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">4</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">2</span></td></tr>
+<tr><td>AUDIÊNCIA ASSINATURAS</td><td class="total-cell">5</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">5</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">4</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">2</span></td></tr>
+<tr><td>REDAÇÃO INTEGRADA</td><td class="total-cell">3</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">1</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">3</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">2</span></td><td><span class="badge" style="background:#BF7FFF22;color:#BF7FFF;border:1px solid #BF7FFF44;">1</span></td></tr>
+</tbody>
+        </table>
+    </div>
+</div>
+
+<div class="slide-container" style="padding:50px 80px 70px;">
+    <h2 class="slide-title" style="margin-bottom:20px;">Licenças por Diretoria</h2>
+    <div class="content-area">
+        <table class="prod-table">
+            <colgroup><col class="c-dir"><col class="c-usr"><col class="c-prod"><col class="c-prod"><col class="c-prod"><col class="c-prod"></colgroup>
+            <thead><tr><th>Diretoria</th><th>Usuários</th><th style="color:#CCFF00;">Jira</th><th style="color:#00BFFF;">Confluence</th><th style="color:#FF6B35;">Jira Service Management</th><th style="color:#BF7FFF;">Jira Product Discovery</th></tr></thead>
+            <tbody><tr><td>VALOR INVESTE</td><td class="total-cell">2</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">2</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">2</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>LIVRE ACESSO</td><td class="total-cell">2</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">2</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">2</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>PROJETOS ESPECIAIS</td><td class="total-cell">2</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">2</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">2</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>CBN</td><td class="total-cell">1</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">1</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">1</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>FINANÇAS</td><td class="total-cell">1</td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">1</span></td><td><span class="badge" style="background:#FF6B3522;color:#FF6B35;border:1px solid #FF6B3544;">1</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>REDAÇÃO SEGMENTADA II</td><td class="total-cell">1</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">1</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">1</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>SERVIÇOS IMPRESSOS</td><td class="total-cell">1</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">1</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">1</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+<tr><td>VALOR ONE</td><td class="total-cell">1</td><td><span class="badge" style="background:#CCFF0022;color:#CCFF00;border:1px solid #CCFF0044;">1</span></td><td><span class="badge" style="background:#00BFFF22;color:#00BFFF;border:1px solid #00BFFF44;">1</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td><td><span class="badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a;">—</span></td></tr>
+</tbody>
+        </table>
+    </div>
+</div>
+
+<!-- SLIDE 6: TOTAL DE LICENÇAS -->
+<div class="slide-container">
+    <h2 class="slide-title">Total de Licenças Ativas</h2>
+    <div class="content-area">
+        <div class="prod-cards">
+
+            <div class="prod-card" style="border-color:#CCFF0044;">
+                <span class="prod-value" style="color:#CCFF00;">223</span>
+                <span class="prod-pct" style="color:#CCFF0088;">98%</span>
+                <span class="prod-label">Jira</span>
+            </div>
+            <div class="prod-card" style="border-color:#00BFFF44;">
+                <span class="prod-value" style="color:#00BFFF;">201</span>
+                <span class="prod-pct" style="color:#00BFFF88;">88%</span>
+                <span class="prod-label">Confluence</span>
+            </div>
+            <div class="prod-card" style="border-color:#FF6B3544;">
+                <span class="prod-value" style="color:#FF6B35;">58</span>
+                <span class="prod-pct" style="color:#FF6B3588;">25%</span>
+                <span class="prod-label">Jira Service Management</span>
+            </div>
+            <div class="prod-card" style="border-color:#BF7FFF44;">
+                <span class="prod-value" style="color:#BF7FFF;">70</span>
+                <span class="prod-pct" style="color:#BF7FFF88;">31%</span>
+                <span class="prod-label">Jira Product Discovery</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 7: ENCERRAMENTO -->
+<div class="slide-container" style="text-align:center;">
+    <div style="width:100%;">
+        <h1 style="color:#deff9a;">FIM.</h1>
+        <p style="font-size:36px; font-weight:600; color:#fff; margin-top:20px;">Dúvidas ou Esclarecimentos</p>
+        <div style="margin-top:100px; padding:30px 80px; border:3px solid #deff9a; display:inline-block; border-radius:100px;">
+            <span style="color:#fff; font-size:22px; letter-spacing:8px;">TI ASSETS MANAGEMENT | 2026</span>
+        </div>
+    </div>
+</div>
+
+
+<div class="slide-counter" id="counter">1 / 7</div>
+
+<script>
+    let current = 0;
+    let animating = false;
+    const slides = document.querySelectorAll('.slide-container');
+    const counter = document.getElementById('counter');
+    function show(i) {
+        if (animating) return;
+        animating = true;
+        slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+        counter.textContent = (i + 1) + ' / ' + slides.length;
+        setTimeout(() => { animating = false; }, 350);
+    }
+    window.addEventListener('keydown', e => {
+        if (e.key === 'ArrowRight' && current < slides.length - 1) show(++current);
+        else if (e.key === 'ArrowLeft' && current > 0) show(--current);
+    });
+    window.addEventListener('click', e => {
+        if (e.clientX > window.innerWidth / 2) { if (current < slides.length - 1) show(++current); }
+        else { if (current > 0) show(--current); }
+    });
+</script>
+</body>
+</html>
